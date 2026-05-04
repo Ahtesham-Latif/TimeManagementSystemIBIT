@@ -1,0 +1,22 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Backend For TMS",
+  "keywords": [
+    "IBIT",
+    "TM"
+  ],
+  "license": "ISC",
+  "author": "Ahtesham Latif",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "sequelize": "^6.37.8",
+    "sqlite3": "^6.0.1"
+  }
+}
