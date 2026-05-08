@@ -8,8 +8,7 @@ import {
   Teacher,
   Room,
   Slot,
-  Specialization,
-  Communication
+  Specialization
 } from '../models/index.js';
 
 const scheduleIncludes = [
@@ -196,7 +195,6 @@ const findScheduleConflicts = async ({
     day,
     slot_table_id
   };
-  const cancelledScheduleIds = await getCancelledScheduleIds();
 
   if (excludeScheduleId !== undefined && excludeScheduleId !== null) {
     whereBase.schedule_id = {
@@ -212,7 +210,7 @@ const findScheduleConflicts = async ({
       }
     });
 
-    if (teacherConflict && !cancelledScheduleIds.has(Number(teacherConflict.schedule_id))) {
+    if (teacherConflict) {
       return {
         error: 'Teacher is already booked for this day and slot',
         conflict: teacherConflict
@@ -233,9 +231,6 @@ const findScheduleConflicts = async ({
   });
 
   const conflict = sectionConflictRows.find((schedule) => {
-    if (cancelledScheduleIds.has(Number(schedule.schedule_id))) {
-      return false;
-    }
     const existingSections = resolveSectionsFromSchedule(schedule);
     return hasSectionOverlap(requestSections, existingSections);
   });
@@ -296,42 +291,6 @@ const sortSchedules = (records) => {
   });
 };
 
-const parseCommunicationContent = (content) => {
-  if (!content) {
-    return null;
-  }
-
-  if (typeof content === 'object') {
-    return content;
-  }
-
-  try {
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
-};
-
-const getCancelledScheduleIds = async () => {
-  const communications = await Communication.findAll({
-    where: {
-      msg_type: 'Slot Cancelled',
-      status: 'Done'
-    },
-    attributes: ['content']
-  });
-
-  const ids = new Set();
-  for (const communication of communications) {
-    const payload = parseCommunicationContent(communication.content);
-    if (payload?.schedule_id !== undefined && payload?.schedule_id !== null) {
-      ids.add(Number(payload.schedule_id));
-    }
-  }
-
-  return ids;
-};
-
 const resolveStudentSchedules = async (batchId, sectionName, specId = null) => {
   const directWhere = {
     batch_id: batchId,
@@ -389,16 +348,12 @@ const resolveStudentSchedules = async (batchId, sectionName, specId = null) => {
       : Promise.resolve([])
   ]);
 
-  const cancelledScheduleIds = await getCancelledScheduleIds();
   const audienceLookup = new Map(audiences.map((audience) => [Number(audience.audience_id), toPlain(audience)]));
 
   const resolved = new Map();
 
   for (const record of directSchedules) {
     const plain = attachCourseCode(record);
-    if (cancelledScheduleIds.has(Number(plain.schedule_id))) {
-      continue;
-    }
     plain.view_scope = 'section';
     plain.resolved_section_name = sectionName;
     resolved.set(plain.schedule_id, plain);
@@ -406,9 +361,6 @@ const resolveStudentSchedules = async (batchId, sectionName, specId = null) => {
 
   for (const record of audienceSchedules) {
     const plain = attachCourseCode(record);
-    if (cancelledScheduleIds.has(Number(plain.schedule_id))) {
-      continue;
-    }
     const audienceId = Number(plain.audience_id);
     plain.view_scope = 'audience';
     plain.resolved_section_name = sectionName;
@@ -554,12 +506,10 @@ export const getAllSchedules = async (req, res) => {
         },
         include: scheduleIncludes
       });
-      const cancelledScheduleIds = await getCancelledScheduleIds();
-      const activeSchedules = schedules.filter((schedule) => !cancelledScheduleIds.has(Number(schedule.schedule_id)));
 
       return res.status(200).json({
         message: "Schedules retrieved successfully",
-        data: sortSchedules(activeSchedules.map(attachCourseCode))
+        data: sortSchedules(schedules.map(attachCourseCode))
       });
     }
 
@@ -586,12 +536,10 @@ export const getAllSchedules = async (req, res) => {
     const schedules = await Schedule.findAll({
       include: scheduleIncludes
     });
-    const cancelledScheduleIds = await getCancelledScheduleIds();
-    const activeSchedules = schedules.filter((schedule) => !cancelledScheduleIds.has(Number(schedule.schedule_id)));
 
     res.status(200).json({
       message: "Schedules retrieved successfully",
-      data: sortSchedules(activeSchedules.map(attachCourseCode))
+      data: sortSchedules(schedules.map(attachCourseCode))
     });
   } catch (error) {
     res.status(500).json({ message: "Error retrieving schedules", error: error.message });

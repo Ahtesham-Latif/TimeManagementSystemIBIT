@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sequelize, { configureSqliteTimeout, renameAudienceSectionNamesColumn, repairScheduleTableSchema, repairAudienceSectionSchema, renameTeacherDepartmentColumn } from './config/database.js';
@@ -18,7 +19,12 @@ import ScheduleRoute from './routes/ScheduleRoute.js';
 const app = express(); 
 
 // 2. Middleware comes SECOND
-app.use(express.json()); 
+app.use(cors());
+app.use(express.json());
+
+app.use(cors({
+    origin: 'http://localhost:3000' // Your frontend's exact URL
+   }));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +40,24 @@ app.get('/panel', (req, res) => {
 app.get('/teacher', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
 });
-
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'ADMIN_updated.html'));
+});
+app.get('/teacher-login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'form.html'));
+});
+app.get('/student-schedule', (req, res) => {
+  res.sendFile(path.join(__dirname, 'student-details.html'));
+});
+app.get('/admin-login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'AdminLoginFrom.html'));
+});
+app.get('/admin-panel', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-slot.html'));
+});
+app.get('/teacher-panel', (req, res) => {
+  res.sendFile(path.join(__dirname, 'fac-sec.html'));
+});
 // 3. Routes come THIRD
 app.use('/api/batches', BatchRoute);
 app.use('/api/courses', CourseRoute);

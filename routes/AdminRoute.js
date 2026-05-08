@@ -1,19 +1,16 @@
 import express from 'express';
 import { 
-  createAdmin, 
-  getAllAdmins, 
-  getAdminById, 
-  updateAdmin, 
-  deleteAdmin 
+  loginAdmin,
+  createAdmin
 } from '../controllers/AdminController.js';
 
 const router = express.Router();
 
-// Full paths will be: /api/admins
-router.post('/', createAdmin);           // POST /api/admins
-router.get('/', getAllAdmins);           // GET /api/admins
-router.get('/:id', getAdminById);        // GET /api/admins/:id
-router.put('/:id', updateAdmin);         // PUT /api/admins/:id
-router.delete('/:id', deleteAdmin);      // DELETE /api/admins/:id
+// Assuming this file is mounted in your main server.js as: 
+// app.use('/api/admins', adminRoutes);
+
+// --- ROUTES ---
+router.post('/login', loginAdmin);         // POST /api/admins/login
+router.post('/', createAdmin);             // POST /api/admins
 
 export default router;
