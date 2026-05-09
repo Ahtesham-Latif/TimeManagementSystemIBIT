@@ -1,0 +1,26 @@
+node_modules/
+/node_modules
+
+# Database files
+db/
+*.db
+*.sqbpro
+
+# Test and command files
+commands.txt
+API_TEST_REQUESTS.txt
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
