@@ -7,6 +7,9 @@ db/
 *.db
 *.sqbpro
 
+# FRONTEND
+admin-dashboard.html
+
 # Test and command files
 commands.txt
 API_TEST_REQUESTS.txt

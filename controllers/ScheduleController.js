@@ -34,6 +34,146 @@ const dayOrder = new Map([
 
 const toPlain = (record) => (record && typeof record.toJSON === 'function' ? record.toJSON() : record);
 
+const scheduleRequestFieldAliases = new Map([
+  ['slotname', 'slot_name'],
+  ['slot_name', 'slot_name'],
+  ['batchname', 'batch_name'],
+  ['batch_name', 'batch_name'],
+  ['coursecode', 'course_code'],
+  ['course_code', 'course_code'],
+  ['teacherid', 'teacher_id'],
+  ['teacher_id', 'teacher_id'],
+  ['roomname', 'room_name'],
+  ['room_name', 'room_name'],
+  ['slottableid', 'slot_table_id'],
+  ['slot_table_id', 'slot_table_id'],
+  ['specname', 'spec_name'],
+  ['spec_name', 'spec_name'],
+  ['specid', 'spec_id'],
+  ['spec_id', 'spec_id'],
+  ['audienceid', 'audience_id'],
+  ['audience_id', 'audience_id'],
+  ['audiencelabel', 'audience_label'],
+  ['audience_label', 'audience_label'],
+  ['audiencename', 'audience_name'],
+  ['audience_name', 'audience_name'],
+  ['slotcolor', 'slot_color'],
+  ['slot_color', 'slot_color'],
+  ['sectionname', 'section_name'],
+  ['section_name', 'section_name'],
+  ['requesttext', 'request_text'],
+  ['request_text', 'request_text']
+]);
+
+const isPresentScheduleValue = (value) =>
+  value !== undefined &&
+  value !== null &&
+  !(typeof value === 'string' && value.trim() === '');
+
+const normalizeScheduleFieldName = (key) => {
+  const normalizedKey = String(key || '')
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase();
+
+  return scheduleRequestFieldAliases.get(normalizedKey) || normalizedKey;
+};
+
+const normalizeScheduleObject = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return {};
+  }
+
+  const normalized = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (!isPresentScheduleValue(value)) {
+      continue;
+    }
+
+    const normalizedKey = normalizeScheduleFieldName(key);
+    normalized[normalizedKey] = value;
+  }
+
+  return normalized;
+};
+
+const parseScheduleRequestText = (value) => {
+  if (!isPresentScheduleValue(value)) {
+    return {};
+  }
+
+  if (typeof value === 'object') {
+    return normalizeScheduleObject(value);
+  }
+
+  const rawText = String(value).trim();
+  if (!rawText) {
+    return {};
+  }
+
+  try {
+    const parsedJson = JSON.parse(rawText);
+    if (parsedJson && typeof parsedJson === 'object' && !Array.isArray(parsedJson)) {
+      return normalizeScheduleObject(parsedJson);
+    }
+  } catch {
+    // Fall back to key/value parsing for pasted text.
+  }
+
+  const parsed = {};
+  for (const line of rawText.split(/\r?\n/)) {
+    const match = line.match(/^\s*([^:=]+?)\s*[:=]\s*(.+?)\s*$/);
+    if (!match) {
+      continue;
+    }
+
+    const [, rawKey, rawValue] = match;
+    const normalizedKey = normalizeScheduleFieldName(rawKey);
+    if (!normalizedKey) {
+      continue;
+    }
+
+    parsed[normalizedKey] = rawValue.trim();
+  }
+
+  return parsed;
+};
+
+const buildScheduleSubmission = (body = {}) => {
+  const requestTextSources = [
+    body.request_text,
+    body.request_payload,
+    body.schedule_request,
+    body.pasted_request
+  ];
+
+  const merged = {};
+
+  for (const source of requestTextSources) {
+    const parsedSource = parseScheduleRequestText(source);
+    Object.assign(merged, parsedSource);
+  }
+
+  for (const [key, value] of Object.entries(body)) {
+    const normalizedKey = normalizeScheduleFieldName(key);
+    if (
+      normalizedKey === 'request_text' ||
+      normalizedKey === 'request_payload' ||
+      normalizedKey === 'schedule_request' ||
+      normalizedKey === 'pasted_request'
+    ) {
+      continue;
+    }
+
+    if (isPresentScheduleValue(value)) {
+      merged[normalizedKey] = value;
+    }
+  }
+
+  return merged;
+};
+
 const attachCourseCode = (schedule) => {
   const plain = toPlain(schedule);
   if (plain.Course && plain.Course.course_code) {
@@ -51,6 +191,13 @@ const attachCourseCode = (schedule) => {
   if (plain.Specialization) {
     plain.spec_name = plain.Specialization.spec_name;
     plain.spec_color = plain.Specialization.spec_color;
+  }
+  if (plain.section_name) {
+    plain.resolved_section_name = plain.section_name;
+    plain.section_label = plain.section_name;
+  } else if (plain.Audience && plain.Audience.audience_label) {
+    plain.resolved_section_name = plain.Audience.audience_label;
+    plain.section_label = plain.Audience.audience_label;
   }
   if (plain.Audience && plain.Audience.audience_label) {
     plain.audience_label = plain.Audience.audience_label;
@@ -176,11 +323,22 @@ const hasSectionOverlap = (leftSections, rightSections) => {
   return leftSections.some((sectionName) => rightSet.has(sectionName));
 };
 
+const normalizeComparableId = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  const numericValue = Number(value);
+  return Number.isNaN(numericValue) ? value : numericValue;
+};
+
 const findScheduleConflicts = async ({
   batch_id,
   day,
   slot_table_id,
   teacher_id,
+  room_id,
+  spec_id,
   section_name,
   audience_id,
   audience_label,
@@ -190,6 +348,8 @@ const findScheduleConflicts = async ({
   if (requestSections === null) {
     return { error: 'Audience not found' };
   }
+
+  const requestSpecId = normalizeComparableId(spec_id);
 
   const whereBase = {
     day,
@@ -218,6 +378,22 @@ const findScheduleConflicts = async ({
     }
   }
 
+  if (room_id !== undefined && room_id !== null && room_id !== '') {
+    const roomConflict = await Schedule.findOne({
+      where: {
+        ...whereBase,
+        room_id
+      }
+    });
+
+    if (roomConflict) {
+      return {
+        error: 'Room is already booked for this day and slot',
+        conflict: roomConflict
+      };
+    }
+  }
+
   if (!batch_id) {
     return { requestSections };
   }
@@ -232,12 +408,21 @@ const findScheduleConflicts = async ({
 
   const conflict = sectionConflictRows.find((schedule) => {
     const existingSections = resolveSectionsFromSchedule(schedule);
-    return hasSectionOverlap(requestSections, existingSections);
+    if (!hasSectionOverlap(requestSections, existingSections)) {
+      return false;
+    }
+
+    const existingSpecId = normalizeComparableId(schedule.spec_id);
+    if (requestSpecId === null || existingSpecId === null) {
+      return true;
+    }
+
+    return existingSpecId === requestSpecId;
   });
 
   if (conflict) {
     return {
-      error: 'This class or audience group is already booked for this day and slot',
+      error: 'This class or audience group is already booked for this day and slot for the same specialization',
       conflict
     };
   }
@@ -251,7 +436,7 @@ const parseSectionNames = (value) => {
   }
 
   return String(value)
-    .split('+')
+    .split(/[+,]/)
     .map((item) => item.trim())
     .filter(Boolean);
 };
@@ -374,6 +559,7 @@ const resolveStudentSchedules = async (batchId, sectionName, specId = null) => {
 
 export const createSchedule = async (req, res) => {
   try {
+    const payload = buildScheduleSubmission(req.body);
     const {
       day,
       slot_color,
@@ -391,7 +577,7 @@ export const createSchedule = async (req, res) => {
       slot_name,
       spec_id,
       spec_name
-    } = req.body;
+    } = payload;
 
     if (!day) {
       return res.status(400).json({ message: "day is required" });
@@ -459,6 +645,8 @@ export const createSchedule = async (req, res) => {
       day,
       slot_table_id: slot.slot_table_id,
       teacher_id: teacher.teacher_id,
+      room_id: room.room_id,
+      spec_id: specialization.spec_id,
       section_name: finalSectionName,
       audience_id: finalAudienceId,
       audience_label: audience_label ?? audience_name
@@ -716,12 +904,16 @@ export const updateSchedule = async (req, res) => {
     const nextBatchId = nextBatch ? nextBatch.batch_id : schedule.batch_id;
     const nextSlotTableId = nextSlot ? nextSlot.slot_table_id : schedule.slot_table_id;
     const nextTeacherId = nextTeacher ? nextTeacher.teacher_id : schedule.teacher_id;
+    const nextRoomId = nextRoom ? nextRoom.room_id : schedule.room_id;
+    const nextSpecId = nextSpec ? nextSpec.spec_id : schedule.spec_id;
 
     const conflictCheck = await findScheduleConflicts({
       batch_id: nextBatchId,
       day: nextDay,
       slot_table_id: nextSlotTableId,
       teacher_id: nextTeacherId,
+      room_id: nextRoomId,
+      spec_id: nextSpecId,
       section_name: nextSectionName,
       audience_id: nextAudienceId,
       excludeScheduleId: schedule.schedule_id

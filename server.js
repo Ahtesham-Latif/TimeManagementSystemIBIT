@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sequelize, { configureSqliteTimeout, renameAudienceSectionNamesColumn, repairScheduleTableSchema, repairAudienceSectionSchema, renameTeacherDepartmentColumn } from './config/database.js';
+import sequelize, { configureSqliteTimeout, renameAudienceSectionNamesColumn, repairScheduleTableSchema, repairAdminTableSchema, repairCommunicationTableSchema, repairAudienceSectionSchema, renameTeacherDepartmentColumn } from './config/database.js';
 import BatchRoute from './routes/BatchRoute.js';
 import CourseRoute from './routes/CourseRoute.js';
 import TeacherRoute from './routes/TeacherRoute.js';
@@ -19,12 +19,10 @@ import ScheduleRoute from './routes/ScheduleRoute.js';
 const app = express(); 
 
 // 2. Middleware comes SECOND
-app.use(cors());
-app.use(express.json());
-
 app.use(cors({
-    origin: 'http://localhost:3000' // Your frontend's exact URL
-   }));
+  origin: 'http://localhost:3000'
+}));
+app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,31 +31,31 @@ app.get('/', (req, res) => {
 res.send('<h1 style = "color: red; text-align: center; background-color: green;">Hello, From JS using Express Framework!</h1>');
 });
 
-app.get('/panel', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
-});
+// app.get('/panel', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
+// });
 
-app.get('/teacher', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
-});
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'ADMIN_updated.html'));
-});
-app.get('/teacher-login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'form.html'));
-});
-app.get('/student-schedule', (req, res) => {
-  res.sendFile(path.join(__dirname, 'student-details.html'));
-});
-app.get('/admin-login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'AdminLoginFrom.html'));
-});
-app.get('/admin-panel', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin-slot.html'));
-});
-app.get('/teacher-panel', (req, res) => {
-  res.sendFile(path.join(__dirname, 'fac-sec.html'));
-});
+// app.get('/teacher', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
+// });
+// app.get('/admin', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'ADMIN_updated.html'));
+// });
+// app.get('/teacher-login', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'form.html'));
+// });
+// app.get('/student-schedule', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'student-details.html'));
+// });
+// app.get('/admin-login', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'AdminLoginFrom.html'));
+// });
+// app.get('/admin-panel', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'admin-slot.html'));
+// });
+// app.get('/teacher-panel', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'fac-sec.html'));
+// });
 // 3. Routes come THIRD
 app.use('/api/batches', BatchRoute);
 app.use('/api/courses', CourseRoute);
@@ -91,9 +89,11 @@ const safeRepair = async (label, operation) => {
 
 sequelize.sync({ alter: false }) // 'alter' updates the table if columns change
   .then(() => configureSqliteTimeout())
+  .then(() => safeRepair('Admin schema repair', repairAdminTableSchema))
+  .then(() => safeRepair('Communication schema repair', repairCommunicationTableSchema))
   .then(() => safeRepair('Schedule schema repair', repairScheduleTableSchema))
   .then(() => safeRepair('Audience column rename', renameAudienceSectionNamesColumn))
-  .then(() => safeRepair('AudienceSection repair', repairAudienceSectionSchema))
+  //.then(() => safeRepair('AudienceSection repair', repairAudienceSectionSchema))
   .then(() => safeRepair('Teacher column rename', renameTeacherDepartmentColumn))
   .then(() => {
     console.log('Database synced & Connected to TMS(IBIT).db');

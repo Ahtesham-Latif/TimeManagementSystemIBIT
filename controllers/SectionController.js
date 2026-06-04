@@ -121,7 +121,7 @@ export const updateSection = async (req, res) => {
 
         for (const audience of audiences) {
           const sections = String(audience.section_names || '')
-            .split('+')
+            .split(/[+,]/)
             .map((item) => item.trim())
             .filter(Boolean)
             .map((item) => (item === section_name ? nextSectionName : item));
@@ -186,7 +186,7 @@ export const deleteSection = async (req, res) => {
 
       for (const audience of audiences) {
         const sections = String(audience.section_names || '')
-          .split('+')
+          .split(/[+,]/)
           .map((item) => item.trim())
           .filter(Boolean)
           .filter((item) => item !== section_name);
