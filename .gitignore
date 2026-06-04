@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 # Dependencies
+=======
+>>>>>>> a2b32e9a8c2097e20be073b6c31b56f329b96534
 node_modules/
 /node_modules
 
@@ -7,9 +10,12 @@ db/
 *.db
 *.sqbpro
 
+<<<<<<< HEAD
 # FRONTEND
 admin-dashboard.html
 
+=======
+>>>>>>> a2b32e9a8c2097e20be073b6c31b56f329b96534
 # Test and command files
 commands.txt
 API_TEST_REQUESTS.txt
