@@ -8,6 +8,7 @@ A comprehensive Timetable Management System developed for the Institute of Busin
 - **Schedule Management**: Create, read, update, and delete timetables, with support for batch, section, specialization, and audience groupings.
 - **Resource Management**: Extensively manage Rooms, Courses, Teachers, Batches, Sections, Specializations, and Slots.
 - **Communications**: Built-in messaging and notification system for timetable changes (e.g., Slot Cancellations).
+- **Comprehensive Testing**: Robust test suite covering authentication, scheduling conflicts, and data integrity using Jest and Supertest.
 - **Automated Database Repair**: Robust on-startup schema validation and SQLite schema repair scripts ensuring database integrity.
 
 ## 🛠️ Tech Stack
@@ -35,9 +36,23 @@ A comprehensive Timetable Management System developed for the Institute of Busin
    ```bash
    npm start
    # or
-   node server.js
+   npm run dev
    ```
    *The server will start on `http://localhost:5000`.*
+
+## 🧪 Testing
+
+The project includes a comprehensive test suite to ensure scheduling logic and security constraints are maintained.
+
+- **Run all tests:**
+  ```bash
+  npm test
+  ```
+- **Run tests with coverage report:**
+  ```bash
+  npm test -- --coverage
+  ```
+*Note: Tests use an in-memory SQLite database (`:memory:`) to ensure isolation and speed.*
 
 ## 📡 API Endpoints Overview
 
@@ -69,8 +84,9 @@ The backend provides a RESTful API mounted under `/api/...`
 - `backend/models/`: Sequelize data model declarations mapping to database tables.
 - `public/`: Contains the vanilla HTML/CSS frontend templates, including `AdminLoginFrom.html`, `TeacherLoginForm.html`, and standard `tms_style.css`.
 
-## 🛡️ Environment & Security
+## 🛡️ Environment & Resilience
 
 - Passwords for both the `Admin` and `Teacher` entities are hashed before storage using `bcryptjs`.
 - CORS is configured in `server.js` to accept requests from `http://localhost:3000` (adjustable depending on where your frontend runs).
 - The local SQLite database (`TMS(IBIT).db`) is auto-generated in the project `/db` directory if it does not already exist upon server start.
+- **SQLite Resilience**: The system implements an exponential backoff retry mechanism (`withSqliteRetry`) and custom `busy_timeout` settings to handle concurrent write operations safely.

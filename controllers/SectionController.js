@@ -93,23 +93,36 @@ export const updateSection = async (req, res) => {
     const transaction = await Section.sequelize.transaction();
 
     try {
+      // 1. If renaming, find linked IDs BEFORE the database potentially cascades them
+      let linkedAudienceIds = [];
       if (nextSectionName !== section_name) {
-        await Schedule.update(
-          { section_name: nextSectionName },
-          { where: { section_name }, transaction }
-        );
-
         const linkedAudienceSections = await AudienceSection.findAll({
           where: { section_name },
           transaction
         });
-        const linkedAudienceIds = [...new Set(linkedAudienceSections.map((row) => row.audience_id))];
+        linkedAudienceIds = [...new Set(linkedAudienceSections.map((row) => row.audience_id))];
+      }
+
+      // 2. Update the parent Section first. 
+      // If DB-level CASCADE is on, this will auto-update Schedule and AudienceSection.
+      await Section.update(
+        { section_name: nextSectionName },
+        { where: { section_name }, transaction }
+      );
+
+      if (nextSectionName !== section_name) {
+        // 3. Manual updates for child tables (in case DB CASCADE is off or for safety)
+        await Schedule.update(
+          { section_name: nextSectionName },
+          { where: { section_name }, transaction }
+        );
 
         await AudienceSection.update(
           { section_name: nextSectionName },
           { where: { section_name }, transaction }
         );
 
+        // 4. Update denormalized string labels in Audience table
         const audiences = linkedAudienceIds.length
           ? await Audience.findAll({
               where: {
@@ -131,18 +144,26 @@ export const updateSection = async (req, res) => {
         }
       }
 
-      await section.update({ section_name: nextSectionName }, { transaction });
       await transaction.commit();
     } catch (error) {
+      console.error('Section update failed:', error);
       await transaction.rollback();
       throw error;
     }
 
+    const updatedSection = await Section.findByPk(nextSectionName);
+
     res.status(200).json({
       message: "Section updated successfully",
-      data: section
+      data: updatedSection
     });
   } catch (error) {
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({ 
+        message: "Validation error", 
+        details: error.errors.map(e => e.message) 
+      });
+    }
     if (error.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ message: "Section name already exists" });
     }
@@ -167,12 +188,14 @@ export const deleteSection = async (req, res) => {
     const transaction = await Section.sequelize.transaction();
 
     try {
-      await Schedule.destroy({ where: { section_name }, transaction });
+      // Find linked audiences before deleting relation
       const linkedAudienceSections = await AudienceSection.findAll({
         where: { section_name },
         transaction
       });
       const linkedAudienceIds = [...new Set(linkedAudienceSections.map((row) => row.audience_id))];
+
+      await Schedule.destroy({ where: { section_name }, transaction });
       await AudienceSection.destroy({ where: { section_name }, transaction });
 
       const audiences = linkedAudienceIds.length
@@ -197,6 +220,7 @@ export const deleteSection = async (req, res) => {
       await section.destroy({ transaction });
       await transaction.commit();
     } catch (error) {
+      console.error('Section deletion failed:', error);
       await transaction.rollback();
       throw error;
     }

@@ -87,16 +87,21 @@ const safeRepair = async (label, operation) => {
   }
 };
 
-sequelize.sync({ alter: false }) // 'alter' updates the table if columns change
-  .then(() => configureSqliteTimeout())
-  .then(() => safeRepair('Admin schema repair', repairAdminTableSchema))
-  .then(() => safeRepair('Communication schema repair', repairCommunicationTableSchema))
-  .then(() => safeRepair('Schedule schema repair', repairScheduleTableSchema))
-  .then(() => safeRepair('Audience column rename', renameAudienceSectionNamesColumn))
-  //.then(() => safeRepair('AudienceSection repair', repairAudienceSectionSchema))
-  .then(() => safeRepair('Teacher column rename', renameTeacherDepartmentColumn))
-  .then(() => {
+const initApp = async () => {
+  if (process.env.NODE_ENV !== 'test') {
+    await sequelize.sync({ alter: false });
+    await configureSqliteTimeout();
+
+    await safeRepair('Admin schema repair', repairAdminTableSchema);
+    await safeRepair('Communication schema repair', repairCommunicationTableSchema);
+    await safeRepair('Schedule schema repair', repairScheduleTableSchema);
+    await safeRepair('Audience column rename', renameAudienceSectionNamesColumn);
+    await safeRepair('Teacher column rename', renameTeacherDepartmentColumn);
     console.log('Database synced & Connected to TMS(IBIT).db');
     app.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://localhost:${PORT}`));
-  })
-  .catch(err => console.error('Database sync failed:', err));
+  }
+};
+
+initApp().catch(err => console.error('Database sync failed:', err));
+
+export default app;

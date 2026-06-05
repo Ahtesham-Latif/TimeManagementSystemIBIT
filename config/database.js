@@ -7,7 +7,9 @@ const __dirname = path.dirname(__filename);
 
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: path.resolve(__dirname, '..', '..', 'db', 'TMS(IBIT).db'),
+  storage: process.env.NODE_ENV === 'test'
+    ? ':memory:'
+    : path.resolve(__dirname, '..', '..', 'db', 'TMS(IBIT).db'),
   logging: false,
   define: {
     freezeTableName: true

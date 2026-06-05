@@ -10,16 +10,15 @@ export const loginAdmin = async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // 1. Find admin by email (ensuring case-insensitivity)
+    // 1. Find admin by email (normalized)
     const admin = await Admin.findOne({ where: { email: email.toLowerCase() } });
     
     if (!admin) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // 2. Compare the plain text password with the hashed password in the DB
+    // 2. Verify hashed password
     const isMatch = await bcrypt.compare(password, admin.password);
-
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -52,10 +51,11 @@ export const createAdmin = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // 2. Save using the hashed password
+    // 1. Save using the plain text password
     const newAdmin = await Admin.create({ 
       admin_name, 
       email: email.toLowerCase(), 
-      password: hashedPassword, 
+      password: hashedPassword,
       permissions_level 
     });
 
