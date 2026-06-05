@@ -151,7 +151,7 @@ export const loginTeacher = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // 2. Compare passwords
+    // 2. Verify hashed password
     const isMatch = await bcrypt.compare(password, teacher.password);
 
     if (!isMatch) {
